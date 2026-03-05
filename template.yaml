@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Minimal MCP server deployed on AWS Lambda behind API Gateway HTTP API.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        PYTHONUNBUFFERED: "1"
+
+Resources:
+  McpHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowMethods:
+          - POST
+        AllowHeaders:
+          - authorization
+          - content-type
+        AllowOrigins:
+          - "*"
+
+  LambdaMcpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: lambda_function.lambda_handler
+      Description: MCP server hosted on Lambda behind HTTP API.
+      Events:
+        McpRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref McpHttpApi
+            Path: /mcp
+            Method: POST
+        McpRouteGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref McpHttpApi
+            Path: /mcp
+            Method: GET
+
+Outputs:
+  LambdaMcpFunctionName:
+    Description: Lambda function name
+    Value: !Ref LambdaMcpFunction
+
+  LambdaMcpFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt LambdaMcpFunction.Arn
+
+  McpEndpointUrl:
+    Description: HTTPS endpoint for Claude-compatible MCP calls
+    Value: !Sub "https://${McpHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/mcp"
